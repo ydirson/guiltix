@@ -1,0 +1,140 @@
+# guiltix - (potential) prototype tool for modern patchqueue handling
+
+## Base principles
+
+* patchqueue in patch files is used as a way of exchanging the state
+  of the queue, and following the changes of the patchqueue over time
+* git commits are used as the primary way to work on the patch queue,
+  and are sync'd back and forth at user request from/to the patch
+  files
+
+
+## Comparisons with prior art
+
+### guilt
+
+Structural pros:
+* patches are actually the first-class citizens, which allows for
+  collaboration and some understanding of history
+* handles any patch, not just a `git-format-patch` output (or is that
+  actually a con?)
+
+Structural cons:
+* overloaded interface (32 subcommands)
+* not single purpose (`guilt commit` making a commit "official" and
+  out of stack), but different nature of commands not obvious
+* commits for unapplied patches are not tracked
+  * => patches must be reapplied on pop/push
+* conflict resolution left as exercise to the user
+  * `.rej` files from good old `patch`, 1970-style
+  * still creating a commit with the resolved part, untracked `.rej`
+    files as only reminder something did not go as expected, possible
+    to create/new patches etc
+* does not track which commit patches are supposed to apply to
+* unapplied patch names not available in git, must look them up in
+  `series` for a `guilt delete`
+* comments in `series` file not in git: must be manually removed there
+  after a patch section they comment gets fully deleted
+* bad interactions with trivial git workflows (git commit)
+* ...?
+
+Contingent cons:
+* antiquated UI with extremely poor discoverability (`guilt new
+  --help` creates a new patch with that name)
+* does not easily allow to share a single clone for different
+  patchqueues in the same repo (cannot switch branch easily because of
+  single status file)
+
+### stgit (WIP)
+
+Structural pros:
+Structural cons:
+Contingent cons:
+
+### gbp-pq, gbp-pq-rpm (WIP)
+
+Refs:
+* https://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.patches.html
+
+Structural pros:
+* limited interface (6 subcommands)
+
+Structural cons:
+* restricted to a single developer doing one full rebase of the
+  patchqueue, no way to share a partial rebase
+* not general-purpose, needs minimal structure of a Debian source
+  packages (patchqueue in `debian/patches/`, `debian/control` required
+  but can be empty; requires `gbp pq import --ignore-new` since
+  creating them makes the tree dirty)
+
+Contingent cons:
+* automatically drops relevant patches on `gbp pq rebase`, but does not
+  seem to drop them from series on `export`?
+
+### gbs (WIP)
+
+https://docs.tizen.org/platform/reference/gbs/gbs-maintenance-models/
+
+https://github.com/intel/gbs
+https://docs.tizen.org/platform/reference/gbs/gbs-build/
+https://youtu.be/DLaD0hHY_F8?t=109
+
+Structural pros:
+
+Structural cons:
+* devs primarily stack commits on dev branch, of which patchqueue is a
+  product: focus is on collaboration through a git branch, at the
+  expense of patchqueue cleanness.
+
+Contingent cons:
+
+
+## Needed workflows
+
+### single user
+
+What: user starts working on a patchqueue stored in a separate git
+repo, imports original patchqueue on the original base commit
+
+How:
+```
+$TOOL import $PATCHDIR
+git rebase -i
+$TOOL export
+git -C $PATCHDIR push
+```
+
+* `$TOOL import -b $QUEUEBRANCH`:
+  * expects a clean git-controlled workspace in $PATCHDIR
+  * creates $QUEUEBRANCH on base commit advertised in $PATCHDIR available in $PWD
+* `$TOOL export` takes care of `git add`, `commit`
+
+### stashing a rebase
+
+What: user takes a break from the rebase, e.g. to switch to another
+branch or have a weekend
+
+How:
+* `$TOOL export` saves
+  * rebase instruction sheet
+  * all local commits, included previous versions of already-rebased
+    patches necessary to reproduce all not-yet-rebased ones
+  * expects *all* base commits of successive patches to be available
+* `$TOOL import` reconstructs the git rebasing state
+
+### sequential multi-user rebase
+
+What: knowledge of patched areas is spread among several persons, who
+work one after the other on their part of the patchqueue
+
+How: In turn, each user pulls $PATCHDIR, and pushes when finished.
+
+### reconciliating rebase with concurrent changes
+
+What: changes were pushed to master while (some part of) the rebase
+was done, user needs to rebase the pathqueue changes onto new master
+
+How:
+* patchqueue must be exported first, so we have 2 proper $PATCHDIR
+  branches, and ours can be rebased on new master
+* patches already applied in the pq branch must be rewound
