@@ -8,6 +8,36 @@
   and are sync'd back and forth at user request from/to the patch
   files
 
+### Why a patchqueue?
+
+"Why would a lowly patchqueue be a better choice than a nice Git
+branch?  Or a [reintegration
+branch](https://github.com/felipec/git-reintegrate/)?" is a question
+that comes quite often, and I was myself a proponent of using Git
+branches... until I was pointed out to a number of limitations.  Let's
+try to list the most compelling things we want to have, and that can't
+easily be done with simple branch:
+
+* maintaining meta-information about the patches: why we use them,
+  what's their status in the queue (backport, upstreamable (with xref
+  to the PR), non-upstreamable, custom stuff with the idea of
+  upstreaming when it's cleaned up enough, etc).  They can also be
+  easily commented out when needed (and with due description) and
+  commented out again to bring them back in a snap.
+
+* rebasing a part of the work and handing it over to a dev knowing
+  better the area of code touched by the next patches: doing that with
+  branches requires to setup specific conventions, and the result
+  lacks the proper audit trail.
+
+* documenting how the patch series evolves over time: a natural fit is
+  the description for a commit that brings the queue from one revision
+  to another.  StGit is able to link successive branches that way
+  without going through patch files, but the tooling around this is
+  heavy (or at least was, when I used it intensively around 2006).
+  OTOH a (properly-crafted) git history of patchfile does not require
+  any special tools to browse, other than `git diff` and friends.
+
 
 ## Comparisons with prior art
 
