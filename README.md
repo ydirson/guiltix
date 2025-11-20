@@ -47,6 +47,9 @@ Contingent cons:
 
 ### stgit (WIP)
 
+Refs:
+* https://wiki.xenproject.org/wiki/Managing_Xen_Patches_with_StGit
+
 Structural pros:
 Structural cons:
 Contingent cons:
@@ -57,7 +60,9 @@ Refs:
 * https://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.patches.html
 
 Structural pros:
-* limited interface (6 subcommands)
+* limited interface (6 subcommands, only 3 essential: import, export,
+  apply), and let use plain git for everything not directly related to
+  the patchqueue work
 
 Structural cons:
 * restricted to a single developer doing one full rebase of the
@@ -88,6 +93,10 @@ Structural cons:
 
 Contingent cons:
 
+### git-series (WIP)
+
+* https://www.youtube.com/watch?v=xJ0DBaHnlQ8
+* https://wiki.xenproject.org/wiki/Managing_Xen_Patches_with_Git-series
 
 ## Needed workflows
 
