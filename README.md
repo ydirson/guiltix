@@ -1,34 +1,182 @@
-# guiltix - (potential) prototype tool for modern patchqueue handling
+# guiltix - (potential) prototype tool for modern patch queue handling
+
+## Context
+
+A distro makes packages from source code coming from upstream
+projects.  But it often needs to apply patches to that upstream
+source, be it for adapting to the unique context of the distro, fixing
+bugs, including new features that, even when not ready for
+upstreaming, are required in the distro's context, etc.
+
+This is typically done by including patch files alongside the upstream
+source (though sometimes an already-patched source tree is used).
+
+### Interlude: a word on already-patched source trees
+
+Assuming the patched source is under revision control, there are
+basically 2 approaches in this field: keeping a single "downstream"
+branch in which patches are committed and into which new upstream
+versions are merged (that is, a fork), and regularly rebasing a branch
+onto newer upstream versions.
+
+First it should be noted that both approaches share a common downside:
+to get a single fix into the package, the natural workflow implies 3
+separate publishing steps: commiting and pushing in the upstream fork,
+creating a new archive and publishing it so the RPM build can access
+it, and updating the RPM packaging.  This can be brought down to 2
+separate publishing steps if tooling is in place so the RPM packaging
+can directly pull from the fork (TBW: need examples of who does that).
+
+The fork approach does not allow (AFAIK) for nice upstreaming
+workflows, since the difference (at Git commit level) from upstream to
+the fork will *always* be seen as including all the commits ever
+included in the fork, regardless of whether a version thereof was
+upstreamed.  Exemples of this approach are numerous in the embedded
+space, with forks of the Linux kernel where `git describe` announces
+tens of thousands of commits added to an official Linus tag.
+
+The "patch queue rebase" approach has the additional downside that
+reviewing the source-code differences has to be done in a different
+repository, and more aspects are discussed in more details later in
+this document, in "Why not just use a branch?".
+
+That said, one case for which already-patched source trees have a
+clear edge today over a "patch queue as patchfiles", is when the
+upstream source includes binary files that need to be modified.
+Although packaging systems usually can handle this through additional
+source files, the tooling to deal with it is basically not here today.
+
+### The patch queue
+
+What we call "patch queue" is thus a collection of single patches and
+of patch series, each with their own topic.  This does not presume
+anything on its representation (even though it is often conflated with
+the "a patch queue as patchfiles and a `series` file" format
+popularized by `quilt` - we'll use "quilt patchqueue" for this
+particular one).
+
+As the packaging of a given upstream version gets revised, new patches
+and series get inserted into the queue, some get replaced, some get
+dropped.  And when the packaging gets updated to a newer upstream
+version, a lot of changes can be needed.
+
+And those changes need to be easily auditable, a-priori by reviewers
+during the packaging update process, or a-posteriori by investigators
+trying to understand the reason why the patched code is in its current
+state.
+
 
 ## Base principles
 
-* patchqueue in patch files is used as a way of exchanging the state
-  of the queue, and following the changes of the patchqueue over time
+* provide a simple audit trail for the evolution of a patch queue
+
+* patchqueue in patchfiles-plus-an-index is used as a way of
+  exchanging the state of the queue, and following the changes of the
+  patchqueue over time.  There may be needs for several metadata
+  formats, both for patchfiles and index, for interoperation with
+  other tools (`git format-patch`, quilt patchqueue (essentially
+  including DEB patchqueue), SRPM-compatible `Patch:` statements,
+  BitBake `SRC_URI` patch list, ...).  This allows to use the
+  packaging data as single source of truth (much like how `gbp pq` and
+  `gbp pq-rpm` work)
+
 * git commits are used as the primary way to work on the patch queue,
   and are sync'd back and forth at user request from/to the patch
   files
 
-### Why a patchqueue?
+### Understanding the domain
 
-"Why would a lowly patchqueue be a better choice than a nice Git
-branch?  Or a [reintegration
+Let's step back for a moment: information to understand the code (a
+`tree` in Git, which would be "abstraction level 0") belong to the
+code files themselves; information to understand the changes
+(aka. level 1, a `commit` in Git) that we make to the code tree belong
+to the commit message: we don't want the latter in the code, just as
+we don't want information to understand the code available solely in
+the commit message.
+
+Then on top of these two concepts, lies the pachqueue itself (making
+it abstraction level 2). It is more than the mere sequence of commits:
+in many cases it is a curated list of commits, some
+cherry-picked/packported from upstream (grouped by the release that
+sports them to prepare future rebases), maybe several patch series for
+distinct features, submitted upstream or not yet ready for upstream,
+even custom ones not meant to be upstreamable.  Then there are many
+informations we may want to keep there (why we took them, how they
+articulate with other parts of the patch queue, ...).  One prominent
+example of a metadata-heavy patch queue is [the Xen patchqueue from
+XenServer](https://github.com/xenserver/xen.pg/blob/master/patches/series).
+
+How this set of metadata changes over time is crucial, just as much as
+it is for the code in the upstream project.  This brings us another
+level of abstraction, the patch queue history, which we'll label
+"level 3" - and hopefully be the last one we'll need :)
+
+Now what tools do we have to deal with this complexity and make it
+bearable?
+
+* code: editors and IDEs, essentially solved
+* code history: version control software, essentially solved
+* patch queues:
+  - file-based formats involving patchfiles
+  - various tools and workflows to use a VCS (StGit, gbs, others?)
+* patch queue history:
+  - standard VCS history of file-based formats
+  - use of git commits with special ref namespace, to record ancestry
+    of a patchqueue-as-git-branch (StGit 0.1x - should check if still
+    the case)
+  - any other?
+
+
+### Why a patchfiles-and-index and not just use a branch?
+
+"Why would a text patchqueue be a better choice than a Git branch?  Or
+a [reintegration
 branch](https://github.com/felipec/git-reintegrate/)?" is a question
-that comes quite often, and I was myself a proponent of using Git
-branches... until I was pointed out to a number of limitations.  Let's
-try to list the most compelling things we want to have, and that can't
-easily be done with simple branch:
+that comes quite often, and it's quite natural, as Git is a more
+modern tool than diff/patch.  I was myself a proponent of using Git
+branches... until I was pointed out to a number of limitations.
+
+But first, one thing to keep in mind is that we're talking about the
+"canonical storage" or "exchange format" of the patch queue.  There's
+no question that Git is a vastly useful tool for *reworking* the patch
+queue, much like we all agree that a tree of text files is a suitable
+"canonical storage" or "exchange format" for code, and people can use
+powerful IDEs to manipulate them.
+
+We *can* find a way to encode this patch queue history (level 3)
+information inside code history and in the patchqueue-as-branch
+(levels 1 and 2) (e.g. include it inside commit messages, or use empty
+commits or merge commits to add meta-information).  But that's similar
+to describing inside the code the changes that were done since
+previous versions of that code: indeed we used to do that sometimes
+when VCSs were non-existent or too heavy to use them like we do now,
+and had no practical place to store that information.
+
+Let's try to list the practical differences between the patchqueue
+approaches above.  In fact the alternatives for patch queues and their
+histories are tightly tied together: you cannot use standard VCS tools
+on it, unless the data you manipulate is in files, and it's very
+uncomfortable when those are not text files (read: at best, needs
+extra tooling).  And similarly the StGit approach only makes sense
+when a Git branch is the primary storage for the patch queue.
+
+So let's reformulate the options we want to compare:
+
+- file-based formats involving patchfiles, stored in a VCS tree
+- StGit model
+- gbs model?
+
+Having a textual description of the sequence of patches that make a
+patch queue makes things easier for several use cases:
 
 * maintaining meta-information about the patches: why we use them,
-  what's their status in the queue (backport, upstreamable (with xref
-  to the PR), non-upstreamable, custom stuff with the idea of
-  upstreaming when it's cleaned up enough, etc).  They can also be
-  easily commented out when needed (and with due description) and
-  commented out again to bring them back in a snap.
-
-* rebasing a part of the work and handing it over to a dev knowing
-  better the area of code touched by the next patches: doing that with
-  branches requires to setup specific conventions, and the result
-  lacks the proper audit trail.
+  what's their status in the queue (backport, upstreamable, etc).
+  When encoded in a text file they can also be easily modified,
+  commented out when needed (and with due description) and commented
+  out again to bring them back in a snap, all with standard Git tools.
+  
+  Encoding them in Git commits requires more overhead to modify them,
+  and special tooling to get the history of their changes.
 
 * documenting how the patch series evolves over time: a natural fit is
   the description for a commit that brings the queue from one revision
