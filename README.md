@@ -191,6 +191,18 @@ patch queue makes things easier for several use cases:
 
 ### guilt
 
+Tool summary:
+
+* maintains a patch queue as patchfiles and a `series` plain-text
+  index (which may include comments)
+* to work on them, applies them on top of original code as git commits
+* allows to pop/push patches to go edit them, not designed to let user
+  use other git tools on the same branch, rather provides its own
+  tools instead
+* does not cover handling the history of the patch series, this is
+  trivial to do with Git (so user has full control of what gets
+  tracked) (and this covers merging different history lines, as text)
+
 Structural pros:
 * patches are actually the first-class citizens, which allows for
   collaboration and some understanding of history
@@ -225,6 +237,14 @@ Contingent cons:
 
 ### stgit (WIP)
 
+Tool summary:
+
+* maintains a patch queue both as git commits, and as textual
+  patchfiles with a `stack.json` index
+* automatically records every single patchqueue change under a
+  separate git ref under `stacks/`, including push/pop (ie. some sort
+  of stack reflog, not meant for sharing)
+
 Refs:
 * https://wiki.xenproject.org/wiki/Managing_Xen_Patches_with_StGit
 
@@ -233,6 +253,14 @@ Structural cons:
 Contingent cons:
 
 ### gbp-pq, gbp-pq-rpm (WIP)
+
+Tool summary:
+
+* maintains a patch queue as patchfiles and the DEB/RPM patch index
+  expected by the source-package format
+* lets user import into a git branch and export back to package
+  format, and use plain git for everything not directly related to the
+  patchqueue work
 
 Refs:
 * https://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.patches.html
@@ -272,6 +300,18 @@ Structural cons:
 Contingent cons:
 
 ### git-series (WIP)
+
+Tool summary:
+
+* main focus is support is supporting patch-series history, for
+  preparing successive versions of a patch series to be submitted to
+  an upstream project
+* meant for a single topic, so lacks support for pq metadata?
+* implemented as extra tooling to store the series' history in git
+  refs.  Lets user manipulate the series tree (add to index, commit a
+  new revision of the series) when it fits
+* development stalled, last commit in 2024, last release published in
+  2019
 
 * https://www.youtube.com/watch?v=xJ0DBaHnlQ8
 * https://wiki.xenproject.org/wiki/Managing_Xen_Patches_with_Git-series
