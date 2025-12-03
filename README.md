@@ -205,7 +205,7 @@ Tool summary:
 
 Structural pros:
 * patches are actually the first-class citizens, which allows for
-  collaboration and some understanding of history
+  interoperability, collaboration and some understanding of history
 * handles any patch, not just a `git-format-patch` output (or is that
   actually a con?)
 
@@ -252,7 +252,7 @@ Structural pros:
 Structural cons:
 Contingent cons:
 
-### gbp-pq, gbp-pq-rpm (WIP)
+### gbp-pq, gbp-pq-rpm
 
 Tool summary:
 
@@ -267,20 +267,43 @@ Refs:
 
 Structural pros:
 * limited interface (6 subcommands, only 3 essential: import, export,
-  apply), and let use plain git for everything not directly related to
-  the patchqueue work
+  apply)
 
 Structural cons:
 * restricted to a single developer doing one full rebase of the
   patchqueue, no way to share a partial rebase
-* not general-purpose, needs minimal structure of a Debian source
-  packages (patchqueue in `debian/patches/`, `debian/control` required
-  but can be empty; requires `gbp pq import --ignore-new` since
-  creating them makes the tree dirty)
+* not general-purpose:
+  - `gbp-pq` is tied to the Debian source packages structure
+    (patchqueue in `debian/patches/`, `debian/control` required but
+    can be empty; requires `gbp pq import --ignore-new` since creating
+    them makes the tree dirty)
+  - both assume the packaging git branch and the upstream git branch
+    live in the same repository, making it not possible (or at least
+    very impractical) to have several packages in a single "monorepo".
+    This is reasonable given the structure of a DEB source tree (which
+    has to include the unpacked upstream source), but makes the
+    approach not suitable for a Yocto-like packaging repo, which can
+    be applied to RPM.
+* (or is it contigent?) `gbp-pq-rpm` does not preserve import patch
+  names on export, and relocates all Patch clauses in specfile so they
+  are grouped.  It does not loose the previously-interpersed comments
+  but looses any link with the patches they describe.
 
 Contingent cons:
 * automatically drops relevant patches on `gbp pq rebase`, but does not
   seem to drop them from series on `export`?
+* `gbp-pq-rpm` (indeed `gbp.patch_series`) requires specfile and
+  patches to be in the same dir: no support (in 0.9.38) for
+  formely-common `SPECS/` + `SOURCES/` layout
+
+Other notes:
+* upstream seems to be stalled (and their cgit server dying)
+* `gbp-pq-rpm` support for `%if/%ifarch` assumes no interaction
+  between conditional patches and the rest (developement work is
+  always done with all patches applied, the conditional gets into the
+  commit message).  This reserves the `%if` feature for very specific
+  usage when the patch *should absolutely not* be applied in the other
+  cases - which is not unreasonable.
 
 ### gbs (WIP)
 
